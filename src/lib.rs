@@ -18,5 +18,7 @@ pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<(), Error> {
         return Err(Error::InvalidSignature);
     }
 
+    let first_chunk = parse_chunk(stream);
+
     Ok(())
 }

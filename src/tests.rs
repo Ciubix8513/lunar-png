@@ -10,8 +10,5 @@ fn test_loading() {
 
     assert_eq!(read_png(&mut image), Ok(()));
 
-    assert_eq!(
-        read_png(&mut incorect_image.into_iter()),
-        Err(Error::InvalidSignature)
-    );
+    assert_eq!(read_png(&mut incorect_image), Err(Error::InvalidSignature));
 }

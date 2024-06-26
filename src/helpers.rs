@@ -1,6 +1,7 @@
 use crate::Error;
 
 #[allow(non_camel_case_types)]
+#[derive(Debug)]
 pub enum ChunkType {
     ///Image header
     IHDR,
@@ -42,7 +43,6 @@ pub struct Chunk {
     chunk_type: ChunkType,
     length: u32,
     data: Vec<u8>,
-    crc: [u8; 4],
 }
 
 pub fn get_chunk_type(data: [u8; 4]) -> Result<ChunkType, Error> {
@@ -101,16 +101,71 @@ pub fn read_n<T: Default + Copy>(stream: &mut impl Iterator<Item = T>, n: u32) -
     o
 }
 
+//TODO error handling
 pub fn parse_chunk(stream: &mut impl Iterator<Item = u8>) -> Chunk {
-    let length = u32::from_ne_bytes(read_n_const(stream));
-    let chunk_type = get_chunk_type(read_n_const(stream)).unwrap();
-    let data = read_n(stream, length);
+    let length = u32::from_be_bytes(read_n_const(stream));
+    //Read type + data
+    let mut data = read_n(stream, length + 4);
+
+    let computed_crc = u32::to_be_bytes(compute_crc(&data));
     let crc = read_n_const(stream);
+
+    if computed_crc != crc {
+        panic!("Incorect CRC");
+    }
+
+    let mut chunk_type = [0; 4];
+
+    for i in 0..4 {
+        chunk_type[i] = data.remove(0);
+    }
+
+    let chunk_type = get_chunk_type(chunk_type).unwrap();
 
     Chunk {
         length,
         chunk_type,
         data,
-        crc,
     }
+}
+
+///Statically computed table for fast CRC computation
+const fn compute_crc_table() -> [u32; 256] {
+    let mut n = 0u32;
+    let mut k;
+
+    let mut output = [0u32; 256];
+
+    while n < 256 {
+        let mut c = n;
+
+        k = 0;
+        while k < 8 {
+            if c & 1 == 1 {
+                c = 0xedb88320 ^ (c >> 1);
+            } else {
+                c = c >> 1;
+            }
+            k += 1;
+        }
+        output[n as usize] = c;
+        n += 1;
+    }
+
+    output
+}
+
+//Copied from sample CRC implementation https://www.w3.org/TR/png-3/#samplecrc
+///Calculates 32bit CRC
+
+pub fn compute_crc(data: &[u8]) -> u32 {
+    let mut c = u32::MAX;
+
+    let table = compute_crc_table();
+    for i in data {
+        let i = *i as u32;
+        c = table[((c ^ i) & 0xff) as usize] ^ (c >> 8)
+    }
+
+    c ^ u32::MAX
 }
