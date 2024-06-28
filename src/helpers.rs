@@ -1,7 +1,7 @@
 use crate::Error;
 
 #[allow(non_camel_case_types)]
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum ChunkType {
     ///Image header
     IHDR,
@@ -21,9 +21,11 @@ pub enum ChunkType {
     sRGB,
     cICP,
     mDCv,
-    //Textual information
+    ///International textual data
     iTXt,
+    ///Textual data
     tEXt,
+    ///Compressed textual data
     zTXt,
     //Misc information
     bKGD,
@@ -39,10 +41,64 @@ pub enum ChunkType {
     fdAT,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum ColorType {
+    Greyscale,
+    Truecolor,
+    IndexedColor,
+    GreyscaleAlpha,
+    TruecolorAlpha,
+}
+
+pub fn to_color_type(t: u8) -> ColorType {
+    match t {
+        0 => ColorType::Greyscale,
+        2 => ColorType::Truecolor,
+        3 => ColorType::IndexedColor,
+        4 => ColorType::GreyscaleAlpha,
+        6 => ColorType::TruecolorAlpha,
+        _ => unreachable!(),
+    }
+}
+
+pub fn validate_bit_depth(t: ColorType, depth: u8) -> bool {
+    let valid = match t {
+        ColorType::Greyscale => vec![1, 2, 4, 8, 16],
+        ColorType::Truecolor => vec![8, 16],
+        ColorType::IndexedColor => vec![1, 2, 4, 8],
+        ColorType::GreyscaleAlpha => vec![8, 16],
+        ColorType::TruecolorAlpha => vec![8, 16],
+    };
+
+    for i in valid {
+        if i == depth {
+            return true;
+        }
+    }
+
+    false
+}
+
+pub struct Pallete {
+    inner: Vec<u8>,
+}
+
+impl Pallete {
+    pub fn new(data: Vec<u8>) -> Self {
+        Self { inner: data }
+    }
+
+    pub fn get(&self, index: u8) -> &[u8] {
+        let index = index as usize * 3;
+
+        &self.inner[index..index + 3]
+    }
+}
+
 pub struct Chunk {
-    chunk_type: ChunkType,
-    length: u32,
-    data: Vec<u8>,
+    pub chunk_type: ChunkType,
+    pub length: u32,
+    pub data: Vec<u8>,
 }
 
 pub fn get_chunk_type(data: [u8; 4]) -> Result<ChunkType, Error> {
@@ -127,6 +183,12 @@ pub fn parse_chunk(stream: &mut impl Iterator<Item = u8>) -> Chunk {
         chunk_type,
         data,
     }
+}
+
+pub fn extract_string(data: &mut impl Iterator<Item = u8>) -> String {
+    let str = data.take_while(|i| *i != 0).collect::<Vec<_>>();
+
+    String::from_utf8(str).unwrap()
 }
 
 ///Statically computed table for fast CRC computation
