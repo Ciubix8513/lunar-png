@@ -80,10 +80,13 @@ pub fn validate_bit_depth(t: ColorType, depth: u8) -> bool {
 }
 
 pub struct Pallete {
-    inner: Vec<u8>,
+    pub(crate) inner: Vec<u8>,
 }
 
 impl Pallete {
+    pub fn empty() -> Self {
+        Self { inner: Vec::new() }
+    }
     pub fn new(data: Vec<u8>) -> Self {
         Self { inner: data }
     }

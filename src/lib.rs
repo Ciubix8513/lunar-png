@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use helpers::*;
 
 mod helpers;
@@ -11,6 +13,8 @@ pub enum Error {
     InvalidSignature,
     InvalidChunkType,
 }
+
+#[derive(Debug, PartialEq)]
 pub enum ImageType {
     Rgb8,
     Rgba8,
@@ -18,11 +22,22 @@ pub enum ImageType {
     Rgba16,
 }
 
+#[derive(PartialEq)]
 pub struct Image {
-    width: u32,
-    height: u32,
-    img_type: ImageType,
-    data: Vec<u8>,
+    pub width: u32,
+    pub height: u32,
+    pub img_type: ImageType,
+    pub data: Vec<u8>,
+}
+
+impl Debug for Image {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Image")
+            .field("width", &self.width)
+            .field("height", &self.height)
+            .field("img_type", &self.img_type)
+            .finish()
+    }
 }
 
 pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
@@ -55,19 +70,19 @@ pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
         panic!("Invalid compression method");
     }
 
-    println!("Image is {} x {}", width, height);
-    println!("Bit depth = {bit_depth}");
-    println!("Color type = {color_type:?}");
-    println!("Compression method = {compression_method}");
-    println!("Filter method = {filter_method}");
-    println!("interlace_method = {interlace_method}");
+    println!("  | Image is {} x {}", width, height);
+    println!("  | Bit depth = {bit_depth}");
+    println!("  | Color type = {color_type:?}");
+    println!("  | Compression method = {compression_method}");
+    println!("  | Filter method = {filter_method}");
+    println!("  | interlace_method = {interlace_method}");
     let mut total_chunks = 1;
 
     //Start the chunk reading loop
     let mut png_data = Vec::new();
     let mut reached_data = false;
 
-    let mut pallete;
+    let mut pallete = Pallete::empty();
 
     loop {
         //Get the chunk
@@ -76,8 +91,8 @@ pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
         total_chunks += 1;
 
         if chunk.chunk_type == ChunkType::IEND {
-            println!("Finished reading file");
-            println!("total chunks {total_chunks}");
+            println!("  | Finished reading file");
+            println!("  | total chunks {total_chunks}");
 
             break;
         }
@@ -112,7 +127,7 @@ pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
             // ChunkType::acTL => todo!(),
             // ChunkType::fcTL => todo!(),
             // ChunkType::fdAT => todo!(),
-            _ => println!("{:?}", chunk.chunk_type),
+            _ => println!("  | {:?}", chunk.chunk_type),
         }
     }
 
@@ -151,37 +166,36 @@ pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
                     for i in &data {
                         for index in 0..(8 / bit_depth) {
                             let indexer: u8 = (1 << bit_depth) - 1;
-                            let num = i * indexer << index;
-
+                            let num = (i & (indexer << index)) >> index;
                             let normalized = (255 / ((1 << bit_depth) - 1)) * num;
 
                             o.push(normalized);
                         }
                     }
-                    todo!()
+                    o
                 }
-                8 => data,
-                16 => {
-                    todo!()
-                }
+                16 | 8 => data,
                 _ => panic!("Invalid bit depth"),
             };
 
-            //We do be doing some iter crimes :3
-            let data = new_data
-                .iter()
-                .copied()
-                .zip(new_data.iter().cloned())
-                .zip(new_data.iter().copied())
-                .map(|i| vec![i.0 .0, i.0 .1, i.1])
-                .flatten()
-                .collect();
-
-            Image {
-                width,
-                height,
-                img_type: ImageType::Rgb8,
-                data,
+            if bit_depth == 16 {
+                Image {
+                    width,
+                    height,
+                    img_type: ImageType::Rgb16,
+                    data: new_data
+                        .chunks(2)
+                        .into_iter()
+                        .flat_map(|i| [i[0], i[1], i[0], i[1], i[0], i[1]])
+                        .collect(),
+                }
+            } else {
+                Image {
+                    width,
+                    height,
+                    img_type: ImageType::Rgb8,
+                    data: new_data.into_iter().flat_map(|i| [i, i, i]).collect(),
+                }
             }
         }
         ColorType::Truecolor => Image {
@@ -194,9 +208,75 @@ pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
             },
             data,
         },
-        ColorType::IndexedColor => todo!(),
-        ColorType::GreyscaleAlpha => todo!(),
-        ColorType::TruecolorAlpha => todo!(),
+
+        ColorType::TruecolorAlpha => Image {
+            width,
+            height,
+            img_type: if bit_depth == 8 {
+                ImageType::Rgba8
+            } else {
+                ImageType::Rgba16
+            },
+            data,
+        },
+        ColorType::IndexedColor => {
+            println!("  | Pallete length = {}", pallete.inner.len() / 3);
+
+            let indexes = match bit_depth {
+                1 | 2 | 4 => {
+                    let mut o = Vec::new();
+
+                    //Iterate over N bits (N = bit_depth)
+                    //Extract data i & 2^N - 1 << iter_num
+                    for i in &data {
+                        for index in 0..(8 / bit_depth) {
+                            let indexer: u8 = (1 << bit_depth) - 1;
+                            let num = (i & (indexer << index)) >> index;
+                            o.push(num);
+                        }
+                    }
+                    o
+                }
+                8 => data,
+                _ => panic!("Invalid bit depth"),
+            };
+
+            Image {
+                width,
+                height,
+                //TODO deal with transparency
+                img_type: ImageType::Rgb8,
+                data: indexes
+                    .into_iter()
+                    .map(|i| pallete.get(i))
+                    .flatten()
+                    .cloned()
+                    .collect(),
+            }
+        }
+        ColorType::GreyscaleAlpha => {
+            if bit_depth == 16 {
+                Image {
+                    width,
+                    height,
+                    img_type: ImageType::Rgba16,
+                    data: data
+                        .chunks(4)
+                        .flat_map(|i| [i[2], i[3], i[2], i[3], i[2], i[3], i[0], i[1]])
+                        .collect(),
+                }
+            } else {
+                Image {
+                    width,
+                    height,
+                    img_type: ImageType::Rgba8,
+                    data: data
+                        .chunks(2)
+                        .flat_map(|i| [i[1], i[1], i[1], i[0]])
+                        .collect(),
+                }
+            }
+        }
     };
 
     Ok(img)

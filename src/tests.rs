@@ -14,15 +14,18 @@ fn test_loading() {
     for i in images {
         let mut data = Vec::new();
 
+        let file = i.unwrap().path();
+
+        println!("\nLoading {}", file.file_name().unwrap().to_str().unwrap());
         std::fs::OpenOptions::new()
             .read(true)
-            .open(i.unwrap().path())
+            .open(file)
             .unwrap()
             .read_to_end(&mut data)
             .unwrap();
 
         let img = read_png(&mut data.into_iter());
 
-        assert_eq!(img, Ok(()));
+        assert!(img.is_ok());
     }
 }
