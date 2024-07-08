@@ -84,6 +84,8 @@ pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
 
     let mut pallete = Pallete::empty();
 
+    let mut alpha_present = false;
+
     loop {
         //Get the chunk
         let chunk = parse_chunk(stream);
@@ -110,7 +112,9 @@ pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
                 reached_data = true;
                 png_data.extend_from_slice(&chunk.data);
             }
-            // ChunkType::tRNS => todo!(),
+            ChunkType::tRNS => {
+                alpha_present = true;
+            }
             // ChunkType::cHRM => todo!(),
             // ChunkType::gAMA => todo!(),
             // ChunkType::iCCP => todo!(),

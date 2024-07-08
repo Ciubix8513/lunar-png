@@ -29,3 +29,17 @@ fn test_loading() {
         assert!(img.is_ok());
     }
 }
+
+#[test]
+
+fn test_u8_to_u16() {
+    let a = 0x00;
+    let b = 0x00;
+    let expected = 0x0000;
+    assert_eq!(to_u16(a, b), expected);
+
+    let a = 0x01;
+    let b = 0x10;
+    let expected = 0x1001;
+    assert_eq!(to_u16(a, b), expected);
+}

@@ -79,8 +79,29 @@ pub fn validate_bit_depth(t: ColorType, depth: u8) -> bool {
     false
 }
 
+pub struct TrnsPallete {
+    inner: Vec<u8>,
+}
+
+impl TrnsPallete {
+    pub fn empty() -> Self {
+        Self { inner: Vec::new() }
+    }
+    pub fn new(data: Vec<u8>) -> Self {
+        Self { inner: data }
+    }
+
+    pub fn get(&self, index: u8) -> u8 {
+        if index >= self.inner.len() as u8 {
+            255
+        } else {
+            self.inner[index as usize]
+        }
+    }
+}
+
 pub struct Pallete {
-    pub(crate) inner: Vec<u8>,
+    inner: Vec<u8>,
 }
 
 impl Pallete {
@@ -233,4 +254,9 @@ pub fn compute_crc(data: &[u8]) -> u32 {
     }
 
     c ^ u32::MAX
+}
+
+///Merges 2 u8 to create a u16
+pub fn to_u16(a: u8, b: u8) -> u16 {
+    (a as u16) | ((b as u16) << 8)
 }
