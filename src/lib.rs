@@ -22,6 +22,13 @@ pub enum ImageType {
     Rgba16,
 }
 
+enum TransparencyData {
+    None,
+    Greyscale(u16),
+    Truecolor(u16, u16, u16),
+    Indexed(TrnsPallete),
+}
+
 #[derive(PartialEq)]
 pub struct Image {
     pub width: u32,
@@ -84,7 +91,7 @@ pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
 
     let mut pallete = Pallete::empty();
 
-    let mut alpha_present = false;
+    let mut trns_data = TransparencyData::None;
 
     loop {
         //Get the chunk
@@ -113,7 +120,21 @@ pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
                 png_data.extend_from_slice(&chunk.data);
             }
             ChunkType::tRNS => {
-                alpha_present = true;
+                let mut data = chunk.data.into_iter();
+                trns_data = match color_type {
+                    ColorType::Greyscale => {
+                        TransparencyData::Greyscale(u16::from_be_bytes(read_n_const(&mut data)))
+                    }
+                    ColorType::Truecolor => TransparencyData::Truecolor(
+                        u16::from_be_bytes(read_n_const(&mut data)),
+                        u16::from_be_bytes(read_n_const(&mut data)),
+                        u16::from_be_bytes(read_n_const(&mut data)),
+                    ),
+                    ColorType::IndexedColor => {
+                        TransparencyData::Indexed(TrnsPallete::new(data.collect()))
+                    }
+                    _ => panic!("Image can not contain tRNS chunk"),
+                }
             }
             // ChunkType::cHRM => todo!(),
             // ChunkType::gAMA => todo!(),
@@ -183,7 +204,7 @@ pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
             };
 
             if bit_depth == 16 {
-                Image {
+                let mut img = Image {
                     width,
                     height,
                     img_type: ImageType::Rgb16,
@@ -192,26 +213,107 @@ pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
                         .into_iter()
                         .flat_map(|i| [i[0], i[1], i[0], i[1], i[0], i[1]])
                         .collect(),
+                };
+
+                //if a transparency chunck is found, modify the image type and stick on some bytes
+                //at the end of every pixel
+                match trns_data {
+                    TransparencyData::Greyscale(value) => {
+                        img.img_type = ImageType::Rgba16;
+                        img.data = img
+                            .data
+                            .chunks(6)
+                            .flat_map(|c| {
+                                let v = if to_u16(c[0], c[1]) == value { 0 } else { 0xff };
+                                [c[0], c[1], c[2], c[3], c[4], c[5], v, v]
+                            })
+                            .collect();
+                    }
+                    TransparencyData::None => {}
+                    _ => unreachable!(),
                 }
+
+                img
             } else {
-                Image {
+                let mut img = Image {
                     width,
                     height,
                     img_type: ImageType::Rgb8,
                     data: new_data.into_iter().flat_map(|i| [i, i, i]).collect(),
+                };
+
+                match trns_data {
+                    TransparencyData::Greyscale(value) => {
+                        img.img_type = ImageType::Rgba16;
+                        img.data = img
+                            .data
+                            .chunks(3)
+                            .flat_map(|c| {
+                                let v = if c[0] as u16 == value { 0 } else { 0xff };
+                                [c[0], c[1], c[2], v]
+                            })
+                            .collect();
+                    }
+                    TransparencyData::None => {}
+                    _ => unreachable!(),
                 }
+                img
             }
         }
-        ColorType::Truecolor => Image {
-            width,
-            height,
-            img_type: if bit_depth == 8 {
-                ImageType::Rgb8
-            } else {
-                ImageType::Rgb16
-            },
-            data,
-        },
+
+        ColorType::Truecolor => {
+            let mut img = Image {
+                width,
+                height,
+                img_type: if bit_depth == 8 {
+                    ImageType::Rgb8
+                } else {
+                    ImageType::Rgb16
+                },
+                data,
+            };
+            match trns_data {
+                TransparencyData::Truecolor(r, g, b) => {
+                    if bit_depth == 8 {
+                        img.data = img
+                            .data
+                            .chunks(3)
+                            .flat_map(|c| {
+                                let v = if c[0] as u16 == r && c[1] as u16 == g && c[2] as u16 == b
+                                {
+                                    0
+                                } else {
+                                    0xff
+                                };
+                                [c[0], c[1], c[2], v]
+                            })
+                            .collect();
+                        img.img_type = ImageType::Rgba8;
+                    } else {
+                        img.img_type = ImageType::Rgba16;
+
+                        img.data = img
+                            .data
+                            .chunks(6)
+                            .flat_map(|c| {
+                                let v = if to_u16(c[0], c[1]) == r
+                                    && to_u16(c[2], c[3]) == g
+                                    && to_u16(c[4], c[5]) == b
+                                {
+                                    0
+                                } else {
+                                    0xff
+                                };
+                                [c[0], c[1], c[2], c[3], c[4], c[5], v, v]
+                            })
+                            .collect();
+                    }
+                }
+                TransparencyData::None => {}
+                _ => unreachable!(),
+            }
+            img
+        }
 
         ColorType::TruecolorAlpha => Image {
             width,
@@ -224,8 +326,6 @@ pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
             data,
         },
         ColorType::IndexedColor => {
-            println!("  | Pallete length = {}", pallete.inner.len() / 3);
-
             let indexes = match bit_depth {
                 1 | 2 | 4 => {
                     let mut o = Vec::new();
@@ -245,17 +345,32 @@ pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
                 _ => panic!("Invalid bit depth"),
             };
 
-            Image {
-                width,
-                height,
-                //TODO deal with transparency
-                img_type: ImageType::Rgb8,
-                data: indexes
-                    .into_iter()
-                    .map(|i| pallete.get(i))
-                    .flatten()
-                    .cloned()
-                    .collect(),
+            match trns_data {
+                TransparencyData::Indexed(trns_pallete) => Image {
+                    width,
+                    height,
+                    img_type: ImageType::Rgba8,
+                    data: indexes
+                        .into_iter()
+                        .flat_map(|i| {
+                            let c = pallete.get(i);
+                            [c[0], c[1], c[2], trns_pallete.get(i)]
+                        })
+                        .collect(),
+                },
+                TransparencyData::None => Image {
+                    width,
+                    height,
+                    //TODO deal with transparency
+                    img_type: ImageType::Rgb8,
+                    data: indexes
+                        .into_iter()
+                        .flat_map(|i| pallete.get(i))
+                        .cloned()
+                        .collect(),
+                },
+
+                _ => unreachable!(),
             }
         }
         ColorType::GreyscaleAlpha => {
