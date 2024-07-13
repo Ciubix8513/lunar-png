@@ -5,3 +5,13 @@ edition = "2021"
 
 [dependencies]
 flate2 = "1.0.30"
+
+[workspace]
+resolver = "2"
+members = [
+  "examples/viewer"
+]
+
+[workspace.dependencies.png]
+package = "png"
+path = "./"
