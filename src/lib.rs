@@ -47,6 +47,32 @@ impl Debug for Image {
     }
 }
 
+impl Image {
+    ///Adds an alpha channel to the image, does nothing if the image already contains an alpha
+    ///channel
+    pub fn add_alpha(&mut self) {
+        match self.img_type {
+            ImageType::Rgb8 => {
+                self.img_type = ImageType::Rgba8;
+                self.data = self
+                    .data
+                    .chunks(3)
+                    .flat_map(|c| [c[0], c[1], c[2], 0xff])
+                    .collect();
+            }
+            ImageType::Rgb16 => {
+                self.img_type = ImageType::Rgba16;
+                self.data = self
+                    .data
+                    .chunks(6)
+                    .flat_map(|c| [c[0], c[1], c[2], c[3], c[4], c[5], 0xff, 0xff])
+                    .collect();
+            }
+            _ => {}
+        }
+    }
+}
+
 pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
     if &read_n_const(stream) != SIGNATURE {
         //if signature is incorrect , return a corresponding error
