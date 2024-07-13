@@ -61,6 +61,9 @@ impl Image {
                     .collect();
             }
             ImageType::Rgb16 => {
+                println!("img data len = {}", self.data.len());
+                println!("Last = {}", self.data.last().unwrap());
+
                 self.img_type = ImageType::Rgba16;
                 self.data = self
                     .data
@@ -205,7 +208,7 @@ pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
         _ => panic!("Invalid filter method"),
     }
 
-    let img = match color_type {
+    let mut img = match color_type {
         ColorType::Greyscale => {
             let new_data = match bit_depth {
                 1 | 2 | 4 => {
@@ -423,6 +426,23 @@ pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
             }
         }
     };
+
+    let mult = match img.img_type {
+        ImageType::Rgb8 => 3,
+        ImageType::Rgba8 => 4,
+        ImageType::Rgb16 => 6,
+        ImageType::Rgba16 => 8,
+    };
+
+    let expected_len = img.width * img.height * mult;
+
+    //WHY DO I NEED THIS?!?!? WHY IS PNG LIKE THAT!?!?
+    if expected_len != img.data.len() as u32 {
+        let diff = img.data.len() as u32 - expected_len;
+        println!("img has {} more bytes", diff);
+
+        img.data.truncate(img.data.len() - diff as usize);
+    }
 
     Ok(img)
 }
