@@ -228,6 +228,7 @@ pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
     for (index, val) in filtered.data.clone().iter().enumerate() {
         if index % scanline_len as usize == 0 {
             filter_method = *val;
+            println!("Filter method = {filter_method}");
             continue;
         }
 
@@ -291,6 +292,9 @@ pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
     }
 
     let data = unfiltered_data;
+
+    println!("Unfiltered len = {}", data.len());
+
     let mut img = match color_type {
         ColorType::Greyscale => {
             let new_data = match bit_depth {
@@ -301,13 +305,18 @@ pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
                     //Extract data i & 2^N - 1 << iter_num
                     //Normalize over 0-255 (255 / ((2 << N) - 1) * num)
                     for i in &data {
+                        let mut d = Vec::new();
                         for index in 0..(8 / bit_depth) {
-                            let indexer: u8 = (1 << bit_depth) - 1;
-                            let num = (i & (indexer << index)) >> index;
+                            //Complete indexer
+                            let indexer: u8 = ((1 << bit_depth) - 1) << (index * bit_depth);
+                            let num = (i & indexer) >> (index * bit_depth);
                             let normalized = (255 / ((1 << bit_depth) - 1)) * num;
 
-                            o.push(normalized);
+                            d.push(normalized);
                         }
+
+                        d.reverse();
+                        o.append(&mut d);
                     }
                     o
                 }
@@ -446,8 +455,8 @@ pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
                     //Extract data i & 2^N - 1 << iter_num
                     for i in &data {
                         for index in 0..(8 / bit_depth) {
-                            let indexer: u8 = (1 << bit_depth) - 1;
-                            let num = (i & (indexer << index)) >> index;
+                            let indexer: u8 = ((1 << bit_depth) - 1) << (index * bit_depth);
+                            let num = (i & indexer) >> (index * bit_depth);
                             o.push(num);
                         }
                     }
