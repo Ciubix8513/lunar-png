@@ -276,16 +276,21 @@ impl Filtered {
     //  |a|x|
     //  x = current
     pub fn get_a(&self, index: usize) -> u8 {
-        let mut final_index = match self.color_type {
-            ColorType::IndexedColor | ColorType::Greyscale => index.checked_sub(1),
-            ColorType::GreyscaleAlpha => index.checked_sub(2),
-            ColorType::Truecolor => index.checked_sub(3),
-            ColorType::TruecolorAlpha => index.checked_sub(4),
+        let offset = match self.color_type {
+            ColorType::IndexedColor | ColorType::Greyscale => 1,
+            ColorType::Truecolor => 3,
+            ColorType::GreyscaleAlpha => 2,
+            ColorType::TruecolorAlpha => 4,
+        };
+
+        if index as u32 % self.scanline_len <= offset as u32 {
+            return 0;
         }
-        .unwrap_or(0);
+
+        let final_index = index.checked_sub(offset).unwrap_or(0);
 
         if final_index as u32 % self.scanline_len == 0 {
-            final_index = usize::MAX;
+            return 0;
         }
 
         self.data.get(final_index as usize).copied().unwrap_or(0)
