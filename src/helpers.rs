@@ -1,4 +1,4 @@
-use crate::Error;
+use crate::{Error, ImageType};
 
 #[allow(non_camel_case_types)]
 #[derive(Debug, PartialEq)]
@@ -259,4 +259,46 @@ pub fn compute_crc(data: &[u8]) -> u32 {
 ///Merges 2 u8 to create a u16
 pub fn to_u16(a: u8, b: u8) -> u16 {
     (a as u16) | ((b as u16) << 8)
+}
+
+pub struct Filtered {
+    pub data: Vec<u8>,
+    pub color_type: ColorType,
+    pub scanline_len: u32,
+}
+
+impl Filtered {
+    pub fn set(&mut self, index: usize, val: u8) {
+        self.data[index] = val;
+    }
+    //Bytes
+    //  |c|b|
+    //  |a|x|
+    //  x = current
+    pub fn get_a(&self, index: usize) -> u8 {
+        let mut final_index = match self.color_type {
+            ColorType::IndexedColor | ColorType::Greyscale => index.checked_sub(1),
+            ColorType::GreyscaleAlpha => index.checked_sub(2),
+            ColorType::Truecolor => index.checked_sub(3),
+            ColorType::TruecolorAlpha => index.checked_sub(4),
+        }
+        .unwrap_or(0);
+
+        if final_index as u32 % self.scanline_len == 0 {
+            final_index = usize::MAX;
+        }
+
+        self.data.get(final_index as usize).copied().unwrap_or(0)
+    }
+
+    pub fn get_b(&self, index: usize) -> u8 {
+        self.data
+            .get(index - self.scanline_len as usize)
+            .copied()
+            .unwrap_or(0)
+    }
+
+    pub fn get_c(&self, index: usize) -> u8 {
+        self.get_a(index - self.scanline_len as usize)
+    }
 }

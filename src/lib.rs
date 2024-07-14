@@ -98,6 +98,10 @@ pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
     let filter_method = data_iter.next().unwrap();
     let interlace_method = data_iter.next().unwrap();
 
+    if filter_method != 0 {
+        panic!("Invalid filter method");
+    }
+
     if !validate_bit_depth(color_type, bit_depth) {
         panic!("Invalid bit depth for {color_type:?} type");
     }
@@ -149,6 +153,7 @@ pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
                 png_data.extend_from_slice(&chunk.data);
             }
             ChunkType::tRNS => {
+                println!("  | Found trns chunk");
                 let mut data = chunk.data.into_iter();
                 trns_data = match color_type {
                     ColorType::Greyscale => {
@@ -166,7 +171,12 @@ pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
                 }
             }
             // ChunkType::cHRM => todo!(),
-            // ChunkType::gAMA => todo!(),
+            ChunkType::gAMA => {
+                let mut data = chunk.data.into_iter();
+                let gama = u32::from_be_bytes(read_n_const(&mut data));
+
+                println!("  | Gamma = {gama}");
+            }
             // ChunkType::iCCP => todo!(),
             // ChunkType::sBIT => todo!(),
             // ChunkType::sRGB => todo!(),
@@ -188,26 +198,99 @@ pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
     //Decompress the data
     let mut data = Vec::new();
     {
-        let mut decoder = flate2::read::ZlibDecoder::new(png_data.as_slice());
+        let mut decoder = flate2::read::ZlibDecoder::new(&png_data[..]);
         use std::io::Read;
-        decoder.read_to_end(&mut data).unwrap();
+        let num_b = decoder.read_to_end(&mut data).unwrap();
+
+        println!("Read {num_b} bytes from zlib");
     }
 
-    //Defiltering
-    match filter_method {
-        //None
-        0 => {}
-        //Sub
-        1 => {}
-        //Up
-        2 => {}
-        //Average
-        3 => {}
-        //Paeth
-        4 => {}
-        _ => panic!("Invalid filter method"),
+    let scanline_len = match color_type {
+        ColorType::Greyscale => bit_depth as u32 * width / 8 + 1,
+        ColorType::Truecolor => bit_depth as u32 * 3 * width / 8 + 1,
+        ColorType::IndexedColor => bit_depth as u32 * width / 8 + 1,
+        ColorType::GreyscaleAlpha => bit_depth as u32 * 2 * width / 8 + 1,
+        ColorType::TruecolorAlpha => bit_depth as u32 * 4 * width / 8 + 1,
+    };
+
+    println!("  | scanline len = {scanline_len}");
+
+    //FILTERING!
+    let mut filtered = Filtered {
+        data,
+        color_type,
+        scanline_len,
+    };
+
+    let mut unfiltered_data = Vec::new();
+    let mut filter_method = 0;
+
+    for (index, val) in filtered.data.clone().iter().enumerate() {
+        if index % scanline_len as usize == 0 {
+            filter_method = *val;
+            continue;
+        }
+
+        match filter_method {
+            //None
+            0 => {
+                //Do nothing
+                unfiltered_data.push(*val);
+            }
+            //Sub
+            1 => {
+                let o = ((*val as u16 + filtered.get_a(index) as u16) % 256) as u8;
+                filtered.set(index, o);
+                unfiltered_data.push(o);
+            }
+            //up
+            2 => {
+                let o = ((*val as u16 + filtered.get_b(index) as u16) % 256) as u8;
+                filtered.set(index, o);
+
+                unfiltered_data.push(o);
+            }
+            //average
+            3 => {
+                let a = filtered.get_a(index) as u16;
+                let b = filtered.get_b(index) as u16;
+
+                let floor = (a + b) / 2;
+
+                let o = ((*val as u16 + floor) % 256) as u8;
+                filtered.set(index, o);
+
+                unfiltered_data.push(o);
+            }
+            //paeth
+            4 => {
+                let a = filtered.get_a(index) as i16;
+                let b = filtered.get_b(index) as i16;
+                let c = filtered.get_c(index) as i16;
+
+                let p = a + b - c;
+                let pa = i16::abs(p - a);
+                let pb = i16::abs(p - b);
+                let pc = i16::abs(p - c);
+
+                let pr = if pa <= pb && pa <= pc {
+                    a
+                } else if pb <= pc {
+                    b
+                } else {
+                    c
+                };
+
+                let o = ((*val as u16 + pr as u16) % 256) as u8;
+                filtered.set(index, o);
+
+                unfiltered_data.push(o);
+            }
+            _ => panic!("Invalid filter method {filter_method}"),
+        }
     }
 
+    let data = unfiltered_data;
     let mut img = match color_type {
         ColorType::Greyscale => {
             let new_data = match bit_depth {
@@ -434,15 +517,15 @@ pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
         ImageType::Rgba16 => 8,
     };
 
-    let expected_len = img.width * img.height * mult;
+    // let expected_len = img.width * img.height * mult;
 
     //WHY DO I NEED THIS?!?!? WHY IS PNG LIKE THAT!?!?
-    if expected_len != img.data.len() as u32 {
-        let diff = img.data.len() as u32 - expected_len;
-        println!("img has {} more bytes", diff);
+    // if expected_len != img.data.len() as u32 {
+    // let diff = img.data.len() as u32 - expected_len;
+    // println!("img has {} more bytes", diff);
 
-        img.data.truncate(img.data.len() - diff as usize);
-    }
+    // img.data.truncate(img.data.len() - diff as usize);
+    // }
 
     Ok(img)
 }
