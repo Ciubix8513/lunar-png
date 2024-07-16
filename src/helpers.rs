@@ -306,4 +306,23 @@ impl Filtered {
     pub fn get_c(&self, index: usize) -> u8 {
         self.get_a(index - self.scanline_len as usize)
     }
+
+    pub fn paeth(&self, index: usize) -> u8 {
+        let a = self.get_a(index) as i16;
+        let b = self.get_b(index) as i16;
+        let c = self.get_c(index) as i16;
+
+        let p = a + b - c;
+        let pa = i16::abs(p - a);
+        let pb = i16::abs(p - b);
+        let pc = i16::abs(p - c);
+
+        if pa <= pb && pa <= pc {
+            a as u8
+        } else if pb <= pc {
+            b as u8
+        } else {
+            c as u8
+        }
+    }
 }
