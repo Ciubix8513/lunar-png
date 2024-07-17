@@ -199,8 +199,6 @@ pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
         ColorType::TruecolorAlpha => ((bit_depth as u32 * 4 * width) / 8) + 1,
     };
 
-    println!("  | scanline len = {scanline_len}");
-
     //FILTERING!
     let mut filtered = Filtered {
         data,
