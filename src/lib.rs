@@ -1,3 +1,7 @@
+//! # lunar-png
+//!
+//! A simple png loading library
+#![deny(missing_docs)]
 #![allow(
     clippy::cast_lossless,
     clippy::cast_possible_truncation,
@@ -18,18 +22,28 @@ mod tests;
 static SIGNATURE: &[u8; 8] = &[0x89u8, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+///Errors that can occur while loading an image
 pub enum Error {
+    ///File has invalid signature
     InvalidSignature,
+    ///A chunk in a file has invalid header
     InvalidChunkType,
+    ///CRC of a chunk is incorrect k
     InvalidCrc,
+    ///Other issue
     InvalidPngData(&'static str),
 }
 
 #[derive(Debug, PartialEq, Eq)]
+///Image type of a loaded image
 pub enum ImageType {
+    ///An rgb image with the bit depth of 8
     Rgb8,
+    ///An rgba image with the bit depth of 8
     Rgba8,
+    ///An rgb image with the bit depth of 16
     Rgb16,
+    ///An rgba image with the bit depth of 16
     Rgba16,
 }
 
@@ -41,10 +55,15 @@ enum TransparencyData {
 }
 
 #[derive(PartialEq, Eq)]
+///A loaded png image
 pub struct Image {
+    ///Width of the image
     pub width: u32,
+    ///Height of the image
     pub height: u32,
+    ///Type of the image
     pub img_type: ImageType,
+    ///Actual data. Data in an image is stored in scanlines, going left to right, top to bottom
     pub data: Vec<u8>,
 }
 
