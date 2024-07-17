@@ -37,6 +37,14 @@ pub enum Error {
 #[derive(Debug, PartialEq, Eq)]
 ///Image type of a loaded image
 pub enum ImageType {
+    ///A grayscale image with bit depth of 8
+    R8,
+    ///A grayscale image with bit depth of 16
+    R16,
+    ///A grayscale image  with an alpha channel and bit depth of 8
+    Ra8,
+    ///A grayscale image  with an alpha channel and bit depth of 16
+    Ra16,
     ///An rgb image with the bit depth of 8
     Rgb8,
     ///An rgba image with the bit depth of 8
@@ -82,6 +90,18 @@ impl Image {
     ///Adds an alpha channel to the image, does nothing if the image already contains an alpha channel
     pub fn add_alpha(&mut self) {
         match self.img_type {
+            ImageType::R8 => {
+                self.img_type = ImageType::Ra8;
+                self.data = self.data.iter().flat_map(|i| [*i, 0xff]).collect();
+            }
+            ImageType::R16 => {
+                self.img_type = ImageType::Ra16;
+                self.data = self
+                    .data
+                    .chunks(2)
+                    .flat_map(|i| [i[0], i[1], 0xff, 0xff])
+                    .collect();
+            }
             ImageType::Rgb8 => {
                 self.img_type = ImageType::Rgba8;
                 self.data = self
@@ -96,6 +116,41 @@ impl Image {
                     .data
                     .chunks(6)
                     .flat_map(|c| [c[0], c[1], c[2], c[3], c[4], c[5], 0xff, 0xff])
+                    .collect();
+            }
+            _ => {}
+        }
+    }
+
+    ///Adds channels to a grayscale image. Does nothing if the image is not grayscale
+    pub fn add_channels(&mut self) {
+        match self.img_type {
+            ImageType::R8 => {
+                self.img_type = ImageType::Rgb8;
+                self.data = self.data.iter().copied().flat_map(|i| [i, i, i]).collect();
+            }
+            ImageType::R16 => {
+                self.img_type = ImageType::Rgb16;
+                self.data = self
+                    .data
+                    .chunks(2)
+                    .flat_map(|i| [i[0], i[1], i[0], i[1], i[0], i[1]])
+                    .collect();
+            }
+            ImageType::Ra8 => {
+                self.img_type = ImageType::Rgba8;
+                self.data = self
+                    .data
+                    .chunks(2)
+                    .flat_map(|i| [i[0], i[0], i[0], i[1]])
+                    .collect();
+            }
+            ImageType::Ra16 => {
+                self.img_type = ImageType::Rgba16;
+                self.data = self
+                    .data
+                    .chunks(4)
+                    .flat_map(|i| [i[0], i[1], i[0], i[1], i[0], i[1], i[2], i[3]])
                     .collect();
             }
             _ => {}
@@ -313,11 +368,8 @@ pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
                 let mut img = Image {
                     width,
                     height,
-                    img_type: ImageType::Rgb16,
-                    data: new_data
-                        .chunks(2)
-                        .flat_map(|i| [i[0], i[1], i[0], i[1], i[0], i[1]])
-                        .collect(),
+                    img_type: ImageType::R16,
+                    data: new_data,
                 };
 
                 //if a transparency chunck is found, modify the image type and stick on some bytes
@@ -327,10 +379,10 @@ pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
                         img.img_type = ImageType::Rgba16;
                         img.data = img
                             .data
-                            .chunks(6)
+                            .chunks(2)
                             .flat_map(|c| {
                                 let v = if to_u16(c[0], c[1]) == value { 0 } else { 0xff };
-                                [c[0], c[1], c[2], c[3], c[4], c[5], v, v]
+                                [c[0], c[1], v, v]
                             })
                             .collect();
                     }
@@ -343,19 +395,19 @@ pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
                 let mut img = Image {
                     width,
                     height,
-                    img_type: ImageType::Rgb8,
-                    data: new_data.into_iter().flat_map(|i| [i, i, i]).collect(),
+                    img_type: ImageType::R8,
+                    data: new_data,
                 };
 
                 match trns_data {
                     TransparencyData::Greyscale(value) => {
-                        img.img_type = ImageType::Rgba16;
+                        img.img_type = ImageType::Ra8;
                         img.data = img
                             .data
-                            .chunks(3)
-                            .flat_map(|c| {
-                                let v = if c[0] as u16 == value { 0 } else { 0xff };
-                                [c[0], c[1], c[2], v]
+                            .iter()
+                            .flat_map(|i| {
+                                let v = if *i as u16 == value { 0 } else { 0xff };
+                                [*i, v]
                             })
                             .collect();
                     }
@@ -482,21 +534,15 @@ pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
                 Image {
                     width,
                     height,
-                    img_type: ImageType::Rgba16,
-                    data: unfiltered_data
-                        .chunks(4)
-                        .flat_map(|i| [i[2], i[3], i[2], i[3], i[2], i[3], i[0], i[1]])
-                        .collect(),
+                    img_type: ImageType::Ra16,
+                    data: unfiltered_data,
                 }
             } else {
                 Image {
                     width,
                     height,
-                    img_type: ImageType::Rgba8,
-                    data: unfiltered_data
-                        .chunks(2)
-                        .flat_map(|i| [i[1], i[1], i[1], i[0]])
-                        .collect(),
+                    img_type: ImageType::Ra8,
+                    data: unfiltered_data,
                 }
             }
         }
