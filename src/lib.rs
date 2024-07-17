@@ -37,10 +37,10 @@ pub enum Error {
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Error::InvalidSignature => write!(f, "invalid signature"),
-            Error::InvalidChunkType => write!(f, "invalid chunk type"),
-            Error::InvalidCrc => write!(f, "invalid chunk crc"),
-            Error::InvalidPngData(msg) => write!(f, "invalid png data: {msg}"),
+            Self::InvalidSignature => write!(f, "invalid signature"),
+            Self::InvalidChunkType => write!(f, "invalid chunk type"),
+            Self::InvalidCrc => write!(f, "invalid chunk crc"),
+            Self::InvalidPngData(msg) => write!(f, "invalid png data: {msg}"),
         }
     }
 }
