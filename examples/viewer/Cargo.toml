@@ -6,6 +6,6 @@ edition = "2021"
 [dependencies]
 bytemuck = {version ="1.16.1", features = ["derive"]}
 futures = "0.3.30"
-png.workspace = true
+lunar-png.workspace = true
 wgpu = "0.20.1"
 winit = "0.30.3"

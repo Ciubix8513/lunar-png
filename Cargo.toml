@@ -1,5 +1,5 @@
 [package]
-name = "png"
+name = "lunar-png"
 version = "0.1.0"
 edition = "2021"
 
@@ -12,6 +12,6 @@ members = [
   "examples/viewer"
 ]
 
-[workspace.dependencies.png]
-package = "png"
+[workspace.dependencies.lunar-png]
+package = "lunar-png"
 path = "./"
