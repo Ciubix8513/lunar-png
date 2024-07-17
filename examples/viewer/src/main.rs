@@ -17,7 +17,7 @@ struct App<'a> {
     device: OnceCell<wgpu::Device>,
     first_resume: bool,
     format: OnceCell<wgpu::TextureFormat>,
-    images: Vec<(png::Image, String)>,
+    images: Vec<(lunar_png::Image, String)>,
     pipeline: OnceCell<wgpu::RenderPipeline>,
     queue: OnceCell<wgpu::Queue>,
     size: (u32, u32),
@@ -186,6 +186,7 @@ impl ApplicationHandler for App<'_> {
         for i in &mut self.images {
             println!("{}", i.1);
             let i = &mut i.0;
+            i.add_channels();
             i.add_alpha();
 
             let texture = device.create_texture_with_data(
@@ -201,14 +202,14 @@ impl ApplicationHandler for App<'_> {
                     sample_count: 1,
                     dimension: wgpu::TextureDimension::D2,
                     format: match i.img_type {
-                        png::ImageType::Rgba8 => wgpu::TextureFormat::Rgba8Unorm,
-                        png::ImageType::Rgba16 => wgpu::TextureFormat::Rgba16Unorm,
+                        lunar_png::ImageType::Rgba8 => wgpu::TextureFormat::Rgba8Unorm,
+                        lunar_png::ImageType::Rgba16 => wgpu::TextureFormat::Rgba16Unorm,
                         _ => unreachable!(),
                     },
                     usage: TextureUsages::COPY_DST | TextureUsages::TEXTURE_BINDING,
                     view_formats: &[match i.img_type {
-                        png::ImageType::Rgba8 => wgpu::TextureFormat::Rgba8Unorm,
-                        png::ImageType::Rgba16 => wgpu::TextureFormat::Rgba16Unorm,
+                        lunar_png::ImageType::Rgba8 => wgpu::TextureFormat::Rgba8Unorm,
+                        lunar_png::ImageType::Rgba16 => wgpu::TextureFormat::Rgba16Unorm,
                         _ => unreachable!(),
                     }],
                 },
@@ -219,8 +220,8 @@ impl ApplicationHandler for App<'_> {
             let view = texture.create_view(&wgpu::TextureViewDescriptor {
                 label: None,
                 format: Some(match i.img_type {
-                    png::ImageType::Rgba8 => wgpu::TextureFormat::Rgba8Unorm,
-                    png::ImageType::Rgba16 => wgpu::TextureFormat::Rgba16Unorm,
+                    lunar_png::ImageType::Rgba8 => wgpu::TextureFormat::Rgba8Unorm,
+                    lunar_png::ImageType::Rgba16 => wgpu::TextureFormat::Rgba16Unorm,
                     _ => unreachable!(),
                 }),
                 dimension: Some(wgpu::TextureViewDimension::D2),
@@ -476,7 +477,7 @@ fn main() {
 
         f.read_to_end(&mut d).unwrap();
 
-        let data1 = png::read_png(&mut d.into_iter()).unwrap();
+        let data1 = lunar_png::read_png(&mut d.into_iter()).unwrap();
         images.push((data1, a));
     }
 
