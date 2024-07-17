@@ -1,7 +1,7 @@
-use crate::{Error, ImageType};
+use crate::Error;
 
-#[allow(non_camel_case_types)]
-#[derive(Debug, PartialEq)]
+#[allow(non_camel_case_types, clippy::upper_case_acronyms)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ChunkType {
     ///Image header
     IHDR,
@@ -64,10 +64,8 @@ pub fn to_color_type(t: u8) -> ColorType {
 pub fn validate_bit_depth(t: ColorType, depth: u8) -> bool {
     let valid = match t {
         ColorType::Greyscale => vec![1, 2, 4, 8, 16],
-        ColorType::Truecolor => vec![8, 16],
         ColorType::IndexedColor => vec![1, 2, 4, 8],
-        ColorType::GreyscaleAlpha => vec![8, 16],
-        ColorType::TruecolorAlpha => vec![8, 16],
+        ColorType::Truecolor | ColorType::GreyscaleAlpha | ColorType::TruecolorAlpha => vec![8, 16],
     };
 
     for i in valid {
@@ -84,10 +82,7 @@ pub struct TrnsPallete {
 }
 
 impl TrnsPallete {
-    pub fn empty() -> Self {
-        Self { inner: Vec::new() }
-    }
-    pub fn new(data: Vec<u8>) -> Self {
+    pub const fn new(data: Vec<u8>) -> Self {
         Self { inner: data }
     }
 
@@ -105,10 +100,10 @@ pub struct Pallete {
 }
 
 impl Pallete {
-    pub fn empty() -> Self {
+    pub const fn empty() -> Self {
         Self { inner: Vec::new() }
     }
-    pub fn new(data: Vec<u8>) -> Self {
+    pub const fn new(data: Vec<u8>) -> Self {
         Self { inner: data }
     }
 
@@ -121,14 +116,11 @@ impl Pallete {
 
 pub struct Chunk {
     pub chunk_type: ChunkType,
-    pub length: u32,
     pub data: Vec<u8>,
 }
 
 pub fn get_chunk_type(data: [u8; 4]) -> Result<ChunkType, Error> {
-    let string = if let Ok(d) = String::from_utf8(data.to_vec()) {
-        d
-    } else {
+    let Ok(string) = String::from_utf8(data.to_vec()) else {
         return Err(Error::InvalidChunkType);
     };
 
@@ -166,8 +158,8 @@ pub fn read_n_const<T: Default + Copy, const N: usize>(
 ) -> [T; N] {
     let mut output = [T::default(); N];
 
-    for i in 0..N {
-        output[i] = stream.next().unwrap();
+    for i in &mut output {
+        *i = stream.next().unwrap();
     }
 
     output
@@ -182,7 +174,7 @@ pub fn read_n<T: Default + Copy>(stream: &mut impl Iterator<Item = T>, n: u32) -
 }
 
 //TODO error handling
-pub fn parse_chunk(stream: &mut impl Iterator<Item = u8>) -> Chunk {
+pub fn parse_chunk(stream: &mut impl Iterator<Item = u8>) -> Result<Chunk, Error> {
     let length = u32::from_be_bytes(read_n_const(stream));
     //Read type + data
     let mut data = read_n(stream, length + 4);
@@ -191,28 +183,18 @@ pub fn parse_chunk(stream: &mut impl Iterator<Item = u8>) -> Chunk {
     let crc = read_n_const(stream);
 
     if computed_crc != crc {
-        panic!("Incorect CRC");
+        return Err(Error::InvalidCrc);
     }
 
     let mut chunk_type = [0; 4];
 
-    for i in 0..4 {
-        chunk_type[i] = data.remove(0);
+    for d in &mut chunk_type {
+        *d = data.remove(0);
     }
 
     let chunk_type = get_chunk_type(chunk_type).unwrap();
 
-    Chunk {
-        length,
-        chunk_type,
-        data,
-    }
-}
-
-pub fn extract_string(data: &mut impl Iterator<Item = u8>) -> String {
-    let str = data.take_while(|i| *i != 0).collect::<Vec<_>>();
-
-    String::from_utf8(str).unwrap()
+    Ok(Chunk { chunk_type, data })
 }
 
 ///Statically computed table for fast CRC computation
@@ -228,9 +210,9 @@ const fn compute_crc_table() -> [u32; 256] {
         k = 0;
         while k < 8 {
             if c & 1 == 1 {
-                c = 0xedb88320 ^ (c >> 1);
+                c = 0xedb8_8320 ^ (c >> 1);
             } else {
-                c = c >> 1;
+                c >>= 1;
             }
             k += 1;
         }
@@ -243,21 +225,20 @@ const fn compute_crc_table() -> [u32; 256] {
 
 //Copied from sample CRC implementation https://www.w3.org/TR/png-3/#samplecrc
 ///Calculates 32bit CRC
-
 pub fn compute_crc(data: &[u8]) -> u32 {
     let mut c = u32::MAX;
 
     let table = compute_crc_table();
     for i in data {
         let i = *i as u32;
-        c = table[((c ^ i) & 0xff) as usize] ^ (c >> 8)
+        c = table[((c ^ i) & 0xff) as usize] ^ (c >> 8);
     }
 
     c ^ u32::MAX
 }
 
 ///Merges 2 u8 to create a u16
-pub fn to_u16(a: u8, b: u8) -> u16 {
+pub const fn to_u16(a: u8, b: u8) -> u16 {
     (a as u16) | ((b as u16) << 8)
 }
 
@@ -287,13 +268,13 @@ impl Filtered {
             return 0;
         }
 
-        let final_index = index.checked_sub(offset).unwrap_or(0);
+        let final_index = index.saturating_sub(offset);
 
         if final_index as u32 % self.scanline_len == 0 {
             return 0;
         }
 
-        self.data.get(final_index as usize).copied().unwrap_or(0)
+        self.data.get(final_index).copied().unwrap_or(0)
     }
 
     pub fn get_b(&self, index: usize) -> u8 {

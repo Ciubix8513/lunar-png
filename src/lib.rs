@@ -6,7 +6,10 @@
 use std::fmt::Debug;
 use std::io::Read;
 
-use helpers::*;
+use helpers::{
+    parse_chunk, read_n_const, to_color_type, to_u16, validate_bit_depth, ChunkType, ColorType,
+    Filtered, Pallete, TrnsPallete,
+};
 
 mod helpers;
 #[cfg(test)]
@@ -18,10 +21,11 @@ static SIGNATURE: &[u8; 8] = &[0x89u8, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]
 pub enum Error {
     InvalidSignature,
     InvalidChunkType,
+    InvalidCrc,
     InvalidPngData(&'static str),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ImageType {
     Rgb8,
     Rgba8,
@@ -36,7 +40,7 @@ enum TransparencyData {
     Indexed(TrnsPallete),
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Eq)]
 pub struct Image {
     pub width: u32,
     pub height: u32,
@@ -44,6 +48,7 @@ pub struct Image {
     pub data: Vec<u8>,
 }
 
+#[allow(clippy::missing_fields_in_debug)]
 impl Debug for Image {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Image")
@@ -55,8 +60,7 @@ impl Debug for Image {
 }
 
 impl Image {
-    ///Adds an alpha channel to the image, does nothing if the image already contains an alpha
-    ///channel
+    ///Adds an alpha channel to the image, does nothing if the image already contains an alpha channel
     pub fn add_alpha(&mut self) {
         match self.img_type {
             ImageType::Rgb8 => {
@@ -68,9 +72,6 @@ impl Image {
                     .collect();
             }
             ImageType::Rgb16 => {
-                println!("img data len = {}", self.data.len());
-                println!("Last = {}", self.data.last().unwrap());
-
                 self.img_type = ImageType::Rgba16;
                 self.data = self
                     .data
@@ -83,14 +84,21 @@ impl Image {
     }
 }
 
+#[allow(clippy::missing_panics_doc, clippy::too_many_lines)]
+///Parses a png image from a given stream
+///
+///# Errors
+///
+///May return an error if the data stream doesn't contain a valid png image
 pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
     if &read_n_const(stream) != SIGNATURE {
         //if signature is incorrect , return a corresponding error
         return Err(Error::InvalidSignature);
     }
 
-    let first_chunk = parse_chunk(stream);
+    let first_chunk = parse_chunk(stream)?;
 
+    //Return an error if the first chunk is not a header
     if first_chunk.chunk_type != ChunkType::IHDR {
         return Err(Error::InvalidPngData(
             "Invalid png file, IHDR must be the first chunk",
@@ -107,6 +115,10 @@ pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
     let filter_method = data_iter.next().unwrap();
     let interlace_method = data_iter.next().unwrap();
 
+    if interlace_method != 0 {
+        todo!("Interlacing not yet supported");
+    }
+
     if filter_method != 0 {
         return Err(Error::InvalidPngData("Invalid filter method"));
     }
@@ -119,35 +131,24 @@ pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
         return Err(Error::InvalidPngData("Invalid compression method"));
     }
 
-    println!("  | Image is {width} x {height}");
-    println!("  | Bit depth = {bit_depth}");
-    println!("  | Color type = {color_type:?}");
-    println!("  | Compression method = {compression_method}");
-    println!("  | Filter method = {filter_method}");
-    println!("  | interlace_method = {interlace_method}");
-    let mut total_chunks = 1;
-
     //Start the chunk reading loop
     let mut png_data = Vec::new();
     let mut reached_data = false;
 
     let mut pallete = Pallete::empty();
-
     let mut trns_data = TransparencyData::None;
 
     loop {
         //Get the chunk
-        let chunk = parse_chunk(stream);
+        let chunk = parse_chunk(stream)?;
 
-        total_chunks += 1;
-
+        //check if it's the last chunk
         if chunk.chunk_type == ChunkType::IEND {
-            println!("  | Finished reading file");
-            println!("  | total chunks {total_chunks}");
-
             break;
         }
 
+        //if we have reached data, it's not the last chunk and it's not an IDAT chunk return an
+        //error
         if reached_data && chunk.chunk_type != ChunkType::IDAT {
             return Err(Error::InvalidPngData(
                 "Invaluid file: Data chunks can not be interupted",
@@ -159,12 +160,13 @@ pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
                 //Get the palette
                 pallete = Pallete::new(chunk.data);
             }
+            //Data
             ChunkType::IDAT => {
                 reached_data = true;
                 png_data.extend_from_slice(&chunk.data);
             }
+            //Transparency
             ChunkType::tRNS => {
-                println!("  | Found trns chunk");
                 let mut data = chunk.data.into_iter();
                 trns_data = match color_type {
                     ColorType::Greyscale => {
@@ -181,28 +183,7 @@ pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
                     _ => return Err(Error::InvalidPngData("Image can not contain tRNS chunk")),
                 }
             }
-            // ChunkType::cHRM => todo!(),
-            ChunkType::gAMA => {
-                let mut data = chunk.data.into_iter();
-                let gama = u32::from_be_bytes(read_n_const(&mut data));
-
-                println!("  | Gamma = {gama}");
-            }
-            // ChunkType::iCCP => todo!(),
-            // ChunkType::sBIT => todo!(),
-            // ChunkType::sRGB => todo!(),
-            // ChunkType::cICP => todo!(),(
-            // ChunkType::mDCv => todo!(),
-            // ChunkType::bKGD => todo!(),
-            // ChunkType::hIST => todo!(),
-            // ChunkType::pHYs => todo!(),
-            // ChunkType::sPLT => todo!(),
-            // ChunkType::eXIf => todo!(),
-            // ChunkType::tIME => todo!(),
-            // ChunkType::acTL => todo!(),
-            // ChunkType::fcTL => todo!(),
-            // ChunkType::fdAT => todo!(),
-            _ => println!("  | {:?}", chunk.chunk_type),
+            _ => {}
         }
     }
 
@@ -282,11 +263,7 @@ pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
         }
     }
 
-    let data = unfiltered_data;
-
-    println!("Unfiltered len = {}", data.len());
-
-    let mut img = match color_type {
+    let img = match color_type {
         ColorType::Greyscale => {
             let new_data = match bit_depth {
                 1 | 2 | 4 => {
@@ -295,7 +272,7 @@ pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
                     //Iterate over N bits (N = bit_depth)
                     //Extract data i & 2^N - 1 << iter_num
                     //Normalize over 0-255 (255 / ((2 << N) - 1) * num)
-                    for i in &data {
+                    for i in &unfiltered_data {
                         let mut d = Vec::new();
                         for index in 0..(8 / bit_depth) {
                             //Complete indexer
@@ -311,7 +288,7 @@ pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
                     }
                     o
                 }
-                16 | 8 => data,
+                16 | 8 => unfiltered_data,
                 _ => return Err(Error::InvalidPngData("Invalid bit depth")),
             };
 
@@ -381,7 +358,7 @@ pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
                 } else {
                     ImageType::Rgb16
                 },
-                data,
+                data: unfiltered_data,
             };
             match trns_data {
                 TransparencyData::Truecolor(r, g, b) => {
@@ -434,7 +411,7 @@ pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
             } else {
                 ImageType::Rgba16
             },
-            data,
+            data: unfiltered_data,
         },
         ColorType::IndexedColor => {
             let indexes = match bit_depth {
@@ -443,7 +420,7 @@ pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
 
                     //Iterate over N bits (N = bit_depth)
                     //Extract data i & 2^N - 1 << iter_num
-                    for i in &data {
+                    for i in &unfiltered_data {
                         for index in 0..(8 / bit_depth) {
                             let indexer: u8 = ((1 << bit_depth) - 1) << (index * bit_depth);
                             let num = (i & indexer) >> (index * bit_depth);
@@ -452,7 +429,7 @@ pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
                     }
                     o
                 }
-                8 => data,
+                8 => unfiltered_data,
                 _ => return Err(Error::InvalidPngData("Invalid bit depth")),
             };
 
@@ -489,7 +466,7 @@ pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
                     width,
                     height,
                     img_type: ImageType::Rgba16,
-                    data: data
+                    data: unfiltered_data
                         .chunks(4)
                         .flat_map(|i| [i[2], i[3], i[2], i[3], i[2], i[3], i[0], i[1]])
                         .collect(),
@@ -499,7 +476,7 @@ pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
                     width,
                     height,
                     img_type: ImageType::Rgba8,
-                    data: data
+                    data: unfiltered_data
                         .chunks(2)
                         .flat_map(|i| [i[1], i[1], i[1], i[0]])
                         .collect(),
@@ -507,23 +484,6 @@ pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
             }
         }
     };
-
-    let mult = match img.img_type {
-        ImageType::Rgb8 => 3,
-        ImageType::Rgba8 => 4,
-        ImageType::Rgb16 => 6,
-        ImageType::Rgba16 => 8,
-    };
-
-    // let expected_len = img.width * img.height * mult;
-
-    //WHY DO I NEED THIS?!?!? WHY IS PNG LIKE THAT!?!?
-    // if expected_len != img.data.len() as u32 {
-    // let diff = img.data.len() as u32 - expected_len;
-    // println!("img has {} more bytes", diff);
-
-    // img.data.truncate(img.data.len() - diff as usize);
-    // }
 
     Ok(img)
 }
