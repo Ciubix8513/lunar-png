@@ -1,18 +1,12 @@
-use std::{
-    cell::OnceCell,
-    io::Read,
-    num::{NonZero, NonZeroU64},
-    path::{Path, PathBuf},
-    str::FromStr,
-    sync::OnceLock,
-};
+#![allow(clippy::cast_precision_loss)]
+use std::{cell::OnceCell, io::Read, num::NonZeroU64, path::PathBuf, str::FromStr, sync::OnceLock};
 
 use bytemuck::{bytes_of, Zeroable};
 use wgpu::{
     include_wgsl,
     util::{BufferInitDescriptor, DeviceExt, StagingBelt},
-    BindGroupEntry, BufferDescriptor, BufferUsages, CommandEncoderDescriptor, Extent3d, Features,
-    TextureDescriptor, TextureUsages,
+    BindGroupEntry, BufferUsages, CommandEncoderDescriptor, Extent3d, Features, TextureDescriptor,
+    TextureUsages,
 };
 use winit::{
     application::ApplicationHandler,
@@ -73,6 +67,7 @@ impl App<'_> {
 }
 
 impl ApplicationHandler for App<'_> {
+    #[allow(clippy::too_many_lines)]
     fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
         if !self.first_resume {
             return;
@@ -123,7 +118,7 @@ impl ApplicationHandler for App<'_> {
         if e.is_err() {
             let err = e.as_ref().unwrap_err();
 
-            println!("{:?}", err);
+            println!("{err:?}");
         }
 
         let (device, queue): (wgpu::Device, wgpu::Queue) = e.unwrap();
@@ -217,7 +212,7 @@ impl ApplicationHandler for App<'_> {
                         _ => unreachable!(),
                     }],
                 },
-                wgpu::util::TextureDataOrder::MipMajor,
+                wgpu::util::TextureDataOrder::LayerMajor,
                 &i.data,
             );
 
@@ -335,7 +330,7 @@ impl ApplicationHandler for App<'_> {
         self.img_data_buf.set(resolution_buffer).unwrap();
         self.pipeline.set(pipeline).unwrap();
 
-        surface.configure(&device, self.surface_config.as_ref().unwrap());
+        surface.configure(device, self.surface_config.as_ref().unwrap());
         self.surface.set(surface).unwrap();
     }
 
@@ -404,7 +399,12 @@ impl ApplicationHandler for App<'_> {
                         view: &color_view,
                         resolve_target: None,
                         ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Clear(wgpu::Color::BLUE),
+                            load: wgpu::LoadOp::Clear(wgpu::Color {
+                                r: 1.0,
+                                g: 0.0,
+                                b: 1.0,
+                                a: 1.0,
+                            }),
                             store: wgpu::StoreOp::Store,
                         },
                     })],
@@ -476,7 +476,8 @@ fn main() {
 
         f.read_to_end(&mut d).unwrap();
 
-        images.push((png::read_png(&mut d.into_iter()).unwrap(), a));
+        let data1 = png::read_png(&mut d.into_iter()).unwrap();
+        images.push((data1, a));
     }
 
     if images.is_empty() {
