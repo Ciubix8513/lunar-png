@@ -2,6 +2,12 @@
 name = "lunar-png"
 version = "0.1.0"
 edition = "2021"
+repository = "https://github.com/Ciubix8513/lunar-logger"
+license = "MIT"
+description = "Simple library for loading png images"
+readme = "README.md"
+keywords = ["png", "image"]
+categories = ["multimedia::images"]
 
 [dependencies]
 flate2 = "1.0.30"
