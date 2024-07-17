@@ -233,7 +233,6 @@ pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
 
     //Start the chunk reading loop
     let mut png_data = Vec::new();
-    let mut reached_data = false;
 
     let mut pallete = Pallete::empty();
     let mut trns_data = TransparencyData::None;
@@ -247,14 +246,6 @@ pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
             break;
         }
 
-        //if we have reached data, it's not the last chunk and it's not an IDAT chunk return an
-        //error
-        if reached_data && chunk.chunk_type != ChunkType::IDAT {
-            return Err(Error::InvalidPngData(
-                "Invaluid file: Data chunks can not be interupted",
-            ));
-        }
-
         match chunk.chunk_type {
             ChunkType::PLTE => {
                 //Get the palette
@@ -262,7 +253,6 @@ pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
             }
             //Data
             ChunkType::IDAT => {
-                reached_data = true;
                 png_data.extend_from_slice(&chunk.data);
             }
             //Transparency
