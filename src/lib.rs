@@ -164,6 +164,19 @@ impl Image {
 ///# Errors
 ///
 ///May return an error if the data stream doesn't contain a valid png image
+///
+///
+///# Examples
+///
+///```no_run
+///# use std::io::Read;
+///# let mut file = std::fs::File::open("...").unwrap();
+///let mut data = Vec::new();
+///
+///file.read_to_end(&mut data);
+///
+///let image = lunar_png::read_png(&mut data.into_iter()).unwrap();
+///```
 pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
     if &read_n_const(stream) != SIGNATURE {
         //if signature is incorrect , return a corresponding error
