@@ -43,3 +43,25 @@ fn test_u8_to_u16() {
     let expected = 0x1001;
     assert_eq!(to_u16(a, b), expected);
 }
+
+#[test]
+fn encoding() {
+    let img = Image {
+        width: 8,
+        height: 8,
+        img_type: ImageType::R8,
+        data: (0..64).map(|_| 255).collect(),
+    };
+
+    let png = encode_png(
+        &img,
+        PngEncodingOptions {
+            compression: CompressionLevel::None,
+            write_timestamp: true,
+        },
+    );
+
+    let img1 = read_png(&mut png.into_iter()).unwrap();
+
+    assert_eq!(img, img1);
+}

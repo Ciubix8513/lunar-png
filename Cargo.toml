@@ -10,7 +10,10 @@ keywords = ["png", "image"]
 categories = ["multimedia::images"]
 
 [dependencies]
-flate2 = "1.0.30"
+bytemuck = { version = "1.24.0", features = ["derive"] }
+chrono = "0.4.42"
+flate2 = {version = "1.0.30", features = ["zlib-rs"]}
+pack1 = { version = "1.0.0", features = ["bytemuck"] }
 
 [workspace]
 resolver = "2"
