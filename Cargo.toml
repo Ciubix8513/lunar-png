@@ -9,11 +9,16 @@ readme = "README.md"
 keywords = ["png", "image"]
 categories = ["multimedia::images"]
 
+[features]
+encoding = ["dep:chrono", "dep:bytemuck", "dep:pack1", "dep:flate2"]
+decoding = ["dep:flate2"]
+default = ["encoding", "decoding"]
+
 [dependencies]
-bytemuck = { version = "1.24.0", features = ["derive"] }
-chrono = "0.4.42"
-flate2 = {version = "1.0.30", features = ["zlib-rs"]}
-pack1 = { version = "1.0.0", features = ["bytemuck"] }
+flate2 = {version = "1.0.30", features = ["zlib-rs"], optional = true}
+chrono = {version = "0.4.42", optional=true}
+bytemuck = { version = "1.24.0", features = ["derive"], optional = true}
+pack1 = { version = "1.0.0", features = ["bytemuck"], optional = true}
 
 [workspace]
 resolver = "2"

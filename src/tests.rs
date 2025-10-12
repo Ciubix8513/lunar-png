@@ -1,5 +1,7 @@
 use std::{io::Read, path::PathBuf};
 
+use crate::{decoding::Error, helpers::to_u16};
+
 use super::*;
 
 #[test]
@@ -31,7 +33,6 @@ fn test_loading() {
 }
 
 #[test]
-
 fn test_u8_to_u16() {
     let a = 0x00;
     let b = 0x00;
