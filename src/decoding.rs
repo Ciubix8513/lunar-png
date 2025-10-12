@@ -165,6 +165,7 @@ pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
         data,
         color_type,
         scanline_len,
+        bit_depth,
     };
 
     let mut unfiltered_data = Vec::new();
@@ -222,7 +223,7 @@ pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
         }
     }
 
-    let img = match color_type {
+    let mut img = match color_type {
         ColorType::Greyscale => {
             let new_data = match bit_depth {
                 1 | 2 | 4 => {
@@ -380,7 +381,15 @@ pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
                         for index in 0..(8 / bit_depth) {
                             let indexer: u8 = ((1 << bit_depth) - 1) << (index * bit_depth);
                             let num = (i & indexer) >> (index * bit_depth);
-                            o.push(num);
+                            //This is a terrible hack, buuut like who's gonna be using 1 bit
+                            //indexed pngs in 2025!?!?
+                            //
+                            //or just indexed pngs in general, it's fiiiiine :3
+                            if bit_depth == 1 {
+                                o.push(num ^ 1);
+                            } else {
+                                o.push(num);
+                            }
                         }
                     }
                     o
@@ -434,6 +443,11 @@ pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
             }
         }
     };
+
+    if bit_depth == 16 {
+        let data_inversed = img.data.chunks(2).flat_map(|i| [i[1], i[0]]).collect();
+        img.data = data_inversed;
+    }
 
     Ok(img)
 }

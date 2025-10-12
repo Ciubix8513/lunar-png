@@ -246,6 +246,7 @@ pub struct Filtered {
     pub data: Vec<u8>,
     pub color_type: ColorType,
     pub scanline_len: u32,
+    pub bit_depth: u8,
 }
 
 impl Filtered {
@@ -262,7 +263,7 @@ impl Filtered {
             ColorType::Truecolor => 3,
             ColorType::GreyscaleAlpha => 2,
             ColorType::TruecolorAlpha => 4,
-        };
+        } * if self.bit_depth == 16 { 2 } else { 1 };
 
         if index as u32 % self.scanline_len <= offset as u32 {
             return 0;
@@ -278,14 +279,22 @@ impl Filtered {
     }
 
     pub fn get_b(&self, index: usize) -> u8 {
-        self.data
-            .get(index - self.scanline_len as usize)
-            .copied()
-            .unwrap_or(0)
+        if index as u32 >= self.scanline_len {
+            self.data
+                .get(index - self.scanline_len as usize)
+                .copied()
+                .unwrap_or(0)
+        } else {
+            0
+        }
     }
 
     pub fn get_c(&self, index: usize) -> u8 {
-        self.get_a(index - self.scanline_len as usize)
+        if index as u32 >= self.scanline_len {
+            self.get_a(index - self.scanline_len as usize)
+        } else {
+            0
+        }
     }
 
     pub fn paeth(&self, index: usize) -> u8 {
