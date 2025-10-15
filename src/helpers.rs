@@ -247,6 +247,7 @@ pub struct Filtered {
     pub color_type: ColorType,
     pub scanline_len: u32,
     pub bit_depth: u8,
+    pub ignore_0: bool,
 }
 
 impl Filtered {
@@ -265,13 +266,13 @@ impl Filtered {
             ColorType::TruecolorAlpha => 4,
         } * if self.bit_depth == 16 { 2 } else { 1 };
 
-        if index as u32 % self.scanline_len <= offset as u32 {
+        if index as u32 % self.scanline_len < offset as u32 {
             return 0;
         }
 
-        let final_index = index.saturating_sub(offset);
+        let final_index = index - offset;
 
-        if final_index as u32 % self.scanline_len == 0 {
+        if (final_index as u32 % self.scanline_len == 0) && self.ignore_0 {
             return 0;
         }
 
@@ -290,7 +291,7 @@ impl Filtered {
     }
 
     pub fn get_c(&self, index: usize) -> u8 {
-        if index as u32 >= self.scanline_len {
+        if index as u32 > self.scanline_len {
             self.get_a(index - self.scanline_len as usize)
         } else {
             0

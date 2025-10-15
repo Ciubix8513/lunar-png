@@ -1,6 +1,9 @@
 use std::io::Write;
 
-use crate::{helpers::compute_crc, Image, ImageType};
+use crate::{
+    helpers::{compute_crc, Filtered},
+    Image, ImageType,
+};
 use chrono::{Datelike, Timelike};
 use flate2::Compression;
 use pack1::{U16BE, U32BE};
@@ -125,16 +128,84 @@ pub fn encode_png(image: &Image, options: PngEncodingOptions) -> Vec<u8> {
     //Allocate enough space for the entire image plus the filter markers
     let mut image_data = Vec::with_capacity(image.data.len() + image.height as usize);
 
-    if !filter {
-        for (ind, d) in image.data.iter().enumerate() {
-            if ind as u32 % image.width == 0 {
-                image_data.push(0);
-            }
+    let scanline_size = image.width
+        * match image.img_type {
+            ImageType::R8 => 1,
+            ImageType::R16 => 2,
+            ImageType::Ra8 => 2,
+            ImageType::Rgb8 => 3,
+            ImageType::Ra16 => 4,
+            ImageType::Rgba8 => 4,
+            ImageType::Rgb16 => 6,
+            ImageType::Rgba16 => 8,
+        };
 
-            image_data.push(*d);
+    let is_16 = image.img_type.is_16_bit();
+
+    println!("img type = {:?}", image.img_type);
+    println!("scanline size = {}", scanline_size);
+    println!("");
+
+    if !filter {
+        if !is_16 {
+            for (ind, d) in image.data.iter().enumerate() {
+                if ind as u32 % scanline_size == 0 {
+                    image_data.push(0);
+                }
+
+                image_data.push(*d);
+            }
+        } else {
+            for (ind, d) in image.data.chunks(2).enumerate() {
+                if ind as u32 % (scanline_size / 2) == 0 {
+                    image_data.push(0);
+                }
+
+                image_data.push(d[1]);
+                image_data.push(d[0]);
+            }
         }
     } else {
-        unimplemented!()
+        let filtetered = Filtered {
+            data: if image.img_type.is_16_bit() {
+                image.data.chunks(2).flat_map(|i| [i[1], i[0]]).collect()
+            } else {
+                image.data.clone()
+            },
+            color_type: match image.img_type {
+                ImageType::R8 | ImageType::R16 => crate::helpers::ColorType::Greyscale,
+                ImageType::Ra8 | ImageType::Ra16 => crate::helpers::ColorType::GreyscaleAlpha,
+                ImageType::Rgb8 | ImageType::Rgb16 => crate::helpers::ColorType::Truecolor,
+                ImageType::Rgba8 | ImageType::Rgba16 => crate::helpers::ColorType::TruecolorAlpha,
+            },
+            scanline_len: scanline_size,
+            bit_depth: match image.img_type {
+                ImageType::R8 | ImageType::Ra8 | ImageType::Rgb8 | ImageType::Rgba8 => 8,
+                _ => 16,
+            },
+            ignore_0: false,
+        };
+
+        if !is_16 {
+            //Paeth filtering
+            for (ind, d) in image.data.iter().enumerate() {
+                if ind as u32 % (scanline_size) == 0 {
+                    image_data.push(4);
+                }
+                let pt = filtetered.paeth(ind);
+                image_data.push(d.wrapping_sub(pt));
+            }
+        } else {
+            let data = image.data.chunks(2).flat_map(|i| [i[1], i[0]]).enumerate();
+
+            for (ind, d) in data {
+                if ind as u32 % (scanline_size) == 0 {
+                    image_data.push(4);
+                }
+                let pt = filtetered.paeth(ind);
+                image_data.push(d.wrapping_sub(pt));
+            }
+        }
     };
 
     let mut enc = flate2::write::ZlibEncoder::new(vec![0x49, 0x44, 0x41, 0x54], profile);

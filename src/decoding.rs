@@ -166,6 +166,7 @@ pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
         color_type,
         scanline_len,
         bit_depth,
+        ignore_0: true,
     };
 
     let mut unfiltered_data = Vec::new();

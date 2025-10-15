@@ -45,6 +45,16 @@ pub enum ImageType {
     Rgba16,
 }
 
+impl ImageType {
+    ///Returns whether the image format is 16 bit or not
+    pub fn is_16_bit(&self) -> bool {
+        match self {
+            ImageType::R8 | ImageType::Ra8 | ImageType::Rgb8 | ImageType::Rgba8 => false,
+            _ => true,
+        }
+    }
+}
+
 #[derive(PartialEq, Eq)]
 ///A loaded png image
 pub struct Image {
