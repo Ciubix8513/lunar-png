@@ -342,6 +342,16 @@ impl ApplicationHandler for App<'_> {
         event: winit::event::WindowEvent,
     ) {
         match event {
+            winit::event::WindowEvent::KeyboardInput {
+                device_id: _,
+                event,
+                is_synthetic: _,
+            } => {
+                if !event.state.is_pressed() {
+                    return;
+                }
+                self.img_index = (self.img_index + 1) % self.images.len();
+            }
             winit::event::WindowEvent::CloseRequested => event_loop.exit(),
             winit::event::WindowEvent::Resized(size) => {
                 let config = self.surface_config.as_mut().unwrap();
