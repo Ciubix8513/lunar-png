@@ -1,8 +1,8 @@
 use std::io::Write;
 
 use crate::{
-    helpers::{compute_crc, Filtered},
     Image, ImageType,
+    helpers::{Filtered, compute_crc},
 };
 use chrono::{Datelike, Timelike};
 use flate2::Compression;

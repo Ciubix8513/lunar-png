@@ -2,7 +2,14 @@
 //!
 //! A simple png decoding and encoding library
 //!
-//! Usage:
+//!
+//!# Crate Features
+//!
+//!The crate is split into 2 features:
+//!- Encoding
+//!- Decoding
+//!
+//!# Usage
 //!
 //! ```no_run
 //!use std::io::Read;
@@ -38,9 +45,9 @@ mod helpers;
 mod tests;
 
 #[cfg(feature = "decoding")]
-pub use decoding::{decode_png, Error};
+pub use decoding::{Error, decode_png};
 #[cfg(feature = "encoding")]
-pub use encoding::{encode_png, CompressionLevel, PngEncodingOptions};
+pub use encoding::{CompressionLevel, PngEncodingOptions, encode_png};
 
 #[derive(Debug, PartialEq, Eq)]
 ///Image type of a loaded image

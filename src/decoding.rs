@@ -1,9 +1,9 @@
 use crate::{
-    helpers::{
-        parse_chunk, read_n_const, to_color_type, to_u16, validate_bit_depth, ChunkType, ColorType,
-        Filtered, Pallete, TrnsPallete,
-    },
     Image, ImageType,
+    helpers::{
+        ChunkType, ColorType, Filtered, Pallete, TrnsPallete, parse_chunk, read_n_const,
+        to_color_type, to_u16, validate_bit_depth,
+    },
 };
 use std::io::Read;
 
