@@ -15,4 +15,5 @@ jobs:
         run: cargo build
       - name: Run tests
         run: cargo test
-
+      - name: Check clippy
+        run: cargo clippy  -- -D warnings -D clippy::pedantic -D clippy::nursery
