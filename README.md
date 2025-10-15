@@ -1,5 +1,5 @@
 # lunar-png
-A simple png loading library
+A simple png encoding and decoding library
 
 
 # Usage
@@ -9,5 +9,9 @@ let mut data = Vec::new();
 
 file.read_to_end(&mut data);
 
-let image = lunar_png::read_png(&mut data.into_iter()).unwrap();
+//Decode a png image
+let image = decode_png(&mut data.into_iter()).unwrap();
+
+//Re-encode that image
+let png = encode_png(&image, &PngEncodingOptions::default());
 ```
