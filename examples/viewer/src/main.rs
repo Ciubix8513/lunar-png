@@ -46,7 +46,7 @@ struct ImgData {
 static WINDOW: OnceLock<Window> = OnceLock::new();
 
 impl App<'_> {
-    fn new() -> Self {
+    const fn new() -> Self {
         Self {
             images: Vec::new(),
             first_resume: true,
@@ -115,9 +115,7 @@ impl ApplicationHandler for App<'_> {
             },
         ));
 
-        if e.is_err() {
-            let err = e.as_ref().unwrap_err();
-
+        if let Err(err) = &e {
             println!("{err:?}");
         }
 
@@ -444,17 +442,17 @@ impl ApplicationHandler for App<'_> {
 }
 
 #[allow(clippy::future_not_send)]
-async fn req_adapter<'a, 'b>(
+async fn req_adapter(
     instance: wgpu::Instance,
-    options: &wgpu::RequestAdapterOptions<'a, 'b>,
+    options: &wgpu::RequestAdapterOptions<'_, '_>,
 ) -> Option<wgpu::Adapter> {
     instance.request_adapter(options).await
 }
 
 #[allow(clippy::future_not_send)]
-async fn req_device<'a>(
+async fn req_device(
     adapter: &wgpu::Adapter,
-    descriptor: &wgpu::DeviceDescriptor<'a>,
+    descriptor: &wgpu::DeviceDescriptor<'_>,
 ) -> Result<(wgpu::Device, wgpu::Queue), wgpu::RequestDeviceError> {
     adapter.request_device(descriptor, None).await
 }
