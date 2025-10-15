@@ -59,7 +59,7 @@ enum TransparencyData {
 ///
 ///file.read_to_end(&mut data);
 ///
-///let image = lunar_png::read_png(&mut data.into_iter()).unwrap();
+///let image = lunar_png::decode_png(&mut data.into_iter()).unwrap();
 ///```
 pub fn decode_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
     if &read_n_const(stream) != SIGNATURE {

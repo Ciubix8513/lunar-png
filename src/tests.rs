@@ -9,7 +9,10 @@ fn test_loading() {
     let mut incorect_image = include_bytes!("../test-data/garbage.png")
         .to_vec()
         .into_iter();
-    assert_eq!(read_png(&mut incorect_image), Err(Error::InvalidSignature));
+    assert_eq!(
+        decode_png(&mut incorect_image),
+        Err(Error::InvalidSignature)
+    );
 
     let images = PathBuf::from("test-data/basic_tests").read_dir().unwrap();
 
@@ -26,7 +29,7 @@ fn test_loading() {
             .read_to_end(&mut data)
             .unwrap();
 
-        let img = read_png(&mut data.into_iter());
+        let img = decode_png(&mut data.into_iter());
 
         assert!(img.is_ok());
     }
@@ -62,7 +65,7 @@ fn encoding() {
         },
     );
 
-    let img1 = read_png(&mut png.into_iter()).unwrap();
+    let img1 = decode_png(&mut png.into_iter()).unwrap();
 
     assert_eq!(img, img1);
 }
