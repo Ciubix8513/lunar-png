@@ -1,10 +1,10 @@
 [package]
 name = "lunar-png"
-version = "0.1.2"
-edition = "2021"
+version = "0.2.0"
+edition = "2024"
 repository = "https://github.com/Ciubix8513/lunar-logger"
 license = "MIT"
-description = "Simple library for loading png images"
+description = "Simple library for encoding and decoding png images"
 readme = "README.md"
 keywords = ["png", "image"]
 categories = ["multimedia::images"]
