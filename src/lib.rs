@@ -47,11 +47,9 @@ pub enum ImageType {
 
 impl ImageType {
     ///Returns whether the image format is 16 bit or not
-    pub fn is_16_bit(&self) -> bool {
-        match self {
-            ImageType::R8 | ImageType::Ra8 | ImageType::Rgb8 | ImageType::Rgba8 => false,
-            _ => true,
-        }
+    #[must_use]
+    pub const fn is_16_bit(&self) -> bool {
+        !matches!(self, Self::R8 | Self::Ra8 | Self::Rgb8 | Self::Rgba8)
     }
 }
 

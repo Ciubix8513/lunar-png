@@ -272,7 +272,7 @@ impl Filtered {
 
         let final_index = index - offset;
 
-        if (final_index as u32 % self.scanline_len == 0) && self.ignore_0 {
+        if (final_index as u32).is_multiple_of(self.scanline_len) && self.ignore_0 {
             return 0;
         }
 

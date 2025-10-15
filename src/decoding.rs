@@ -202,7 +202,7 @@ pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
                 let a = filtered.get_a(index) as u16;
                 let b = filtered.get_b(index) as u16;
 
-                let floor = (a + b) / 2;
+                let floor = u16::midpoint(a, b);
 
                 let o = ((*val as u16 + floor) % 256) as u8;
                 filtered.set(index, o);
@@ -216,11 +216,7 @@ pub fn read_png(stream: &mut impl Iterator<Item = u8>) -> Result<Image, Error> {
 
                 unfiltered_data.push(o);
             }
-            _ => {
-                return Err(Error::InvalidPngData(
-                    "Invalid filter method {filter_method}",
-                ))
-            }
+            _ => return Err(Error::InvalidPngData("Invalid filter method")),
         }
     }
 

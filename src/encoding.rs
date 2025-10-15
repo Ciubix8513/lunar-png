@@ -54,8 +54,10 @@ struct Time {
     second: u8,
 }
 
-///Encodes a png
-pub fn encode_png(image: &Image, options: PngEncodingOptions) -> Vec<u8> {
+///Encodes a png into a byte stream
+#[must_use]
+#[allow(clippy::too_many_lines, clippy::missing_panics_doc)]
+pub fn encode_png(image: &Image, options: &PngEncodingOptions) -> Vec<u8> {
     //Chunk support:
     //IHDR
     //IDAT
@@ -64,7 +66,7 @@ pub fn encode_png(image: &Image, options: PngEncodingOptions) -> Vec<u8> {
 
     let mut stream = Vec::new();
 
-    let signature = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A as u8];
+    let signature = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
     stream.extend_from_slice(&signature);
 
     let header = Header {
@@ -131,41 +133,16 @@ pub fn encode_png(image: &Image, options: PngEncodingOptions) -> Vec<u8> {
     let scanline_size = image.width
         * match image.img_type {
             ImageType::R8 => 1,
-            ImageType::R16 => 2,
-            ImageType::Ra8 => 2,
+            ImageType::R16 | ImageType::Ra8 => 2,
             ImageType::Rgb8 => 3,
-            ImageType::Ra16 => 4,
-            ImageType::Rgba8 => 4,
+            ImageType::Ra16 | ImageType::Rgba8 => 4,
             ImageType::Rgb16 => 6,
             ImageType::Rgba16 => 8,
         };
 
     let is_16 = image.img_type.is_16_bit();
 
-    println!("img type = {:?}", image.img_type);
-    println!("scanline size = {}", scanline_size);
-    println!("");
-
-    if !filter {
-        if !is_16 {
-            for (ind, d) in image.data.iter().enumerate() {
-                if ind as u32 % scanline_size == 0 {
-                    image_data.push(0);
-                }
-
-                image_data.push(*d);
-            }
-        } else {
-            for (ind, d) in image.data.chunks(2).enumerate() {
-                if ind as u32 % (scanline_size / 2) == 0 {
-                    image_data.push(0);
-                }
-
-                image_data.push(d[1]);
-                image_data.push(d[0]);
-            }
-        }
-    } else {
+    if filter {
         let filtetered = Filtered {
             data: if image.img_type.is_16_bit() {
                 image.data.chunks(2).flat_map(|i| [i[1], i[0]]).collect()
@@ -186,27 +163,44 @@ pub fn encode_png(image: &Image, options: PngEncodingOptions) -> Vec<u8> {
             ignore_0: false,
         };
 
-        if !is_16 {
-            //Paeth filtering
-            for (ind, d) in image.data.iter().enumerate() {
-                if ind as u32 % (scanline_size) == 0 {
+        if is_16 {
+            let data = image.data.chunks(2).flat_map(|i| [i[1], i[0]]).enumerate();
+
+            for (ind, d) in data {
+                if (ind as u32).is_multiple_of(scanline_size) {
                     image_data.push(4);
                 }
                 let pt = filtetered.paeth(ind);
                 image_data.push(d.wrapping_sub(pt));
             }
         } else {
-            let data = image.data.chunks(2).flat_map(|i| [i[1], i[0]]).enumerate();
-
-            for (ind, d) in data {
-                if ind as u32 % (scanline_size) == 0 {
+            //Paeth filtering
+            for (ind, d) in image.data.iter().enumerate() {
+                if (ind as u32).is_multiple_of(scanline_size) {
                     image_data.push(4);
                 }
                 let pt = filtetered.paeth(ind);
                 image_data.push(d.wrapping_sub(pt));
             }
         }
-    };
+    } else if is_16 {
+        for (ind, d) in image.data.chunks(2).enumerate() {
+            if (ind as u32).is_multiple_of(scanline_size / 2) {
+                image_data.push(0);
+            }
+
+            image_data.push(d[1]);
+            image_data.push(d[0]);
+        }
+    } else {
+        for (ind, d) in image.data.iter().enumerate() {
+            if (ind as u32).is_multiple_of(scanline_size) {
+                image_data.push(0);
+            }
+
+            image_data.push(*d);
+        }
+    }
 
     let mut enc = flate2::write::ZlibEncoder::new(vec![0x49, 0x44, 0x41, 0x54], profile);
     enc.write_all(&image_data).unwrap();

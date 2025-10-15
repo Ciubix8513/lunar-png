@@ -56,7 +56,7 @@ fn encoding() {
 
     let png = encode_png(
         &img,
-        PngEncodingOptions {
+        &PngEncodingOptions {
             compression: CompressionLevel::None,
             write_timestamp: true,
         },
@@ -78,7 +78,7 @@ fn encoding_compressed() {
 
     let png = encode_png(
         &img,
-        PngEncodingOptions {
+        &PngEncodingOptions {
             compression: CompressionLevel::Fast,
             write_timestamp: true,
         },
@@ -110,7 +110,7 @@ fn all_image_reencoding() {
 
         let png = encode_png(
             &img,
-            PngEncodingOptions {
+            &PngEncodingOptions {
                 compression: CompressionLevel::Fast,
                 write_timestamp: false,
             },
