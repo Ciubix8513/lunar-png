@@ -20,7 +20,7 @@ mod helpers;
 mod tests;
 
 #[cfg(feature = "decoding")]
-pub use decoding::{read_png, Error};
+pub use decoding::{decode_png, Error};
 #[cfg(feature = "encoding")]
 pub use encoding::{encode_png, CompressionLevel, PngEncodingOptions};
 

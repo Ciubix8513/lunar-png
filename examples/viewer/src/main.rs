@@ -487,7 +487,7 @@ fn main() {
 
         f.read_to_end(&mut d).unwrap();
 
-        let data1 = lunar_png::read_png(&mut d.into_iter()).unwrap();
+        let data1 = lunar_png::decode_png(&mut d.into_iter()).unwrap();
         images.push((data1, a));
     }
 

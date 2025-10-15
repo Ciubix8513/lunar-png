@@ -84,7 +84,7 @@ fn encoding_compressed() {
         },
     );
 
-    let img1 = read_png(&mut png.into_iter()).unwrap();
+    let img1 = decode_png(&mut png.into_iter()).unwrap();
 
     assert_eq!(img, img1);
 }
@@ -106,7 +106,7 @@ fn all_image_reencoding() {
             .read_to_end(&mut data)
             .unwrap();
 
-        let img = read_png(&mut data.into_iter()).unwrap();
+        let img = decode_png(&mut data.into_iter()).unwrap();
 
         let png = encode_png(
             &img,
@@ -116,7 +116,7 @@ fn all_image_reencoding() {
             },
         );
 
-        let img1 = read_png(&mut png.into_iter()).unwrap();
+        let img1 = decode_png(&mut png.into_iter()).unwrap();
 
         assert_eq!(img.img_type, img1.img_type);
         assert_eq!(img.width, img1.width);

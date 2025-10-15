@@ -22,7 +22,7 @@ fn test_data() {
             .read_to_end(&mut data)
             .unwrap();
 
-        let img = read_png(&mut data.into_iter()).unwrap();
+        let img = decode_png(&mut data.into_iter()).unwrap();
 
         let png = encode_png(
             &img,
@@ -63,7 +63,7 @@ fn main() {
 
     let mut d1: [u8; 64] = [0; 64];
 
-    for (ind, i) in read_png(&mut png1.iter().copied())
+    for (ind, i) in decode_png(&mut png1.iter().copied())
         .unwrap()
         .data
         .iter()
