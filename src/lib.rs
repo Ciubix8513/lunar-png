@@ -49,7 +49,7 @@ pub use decoding::{Error, decode_png};
 #[cfg(feature = "encoding")]
 pub use encoding::{CompressionLevel, PngEncodingOptions, encode_png};
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 ///Image type of a loaded image
 pub enum ImageType {
     ///A grayscale image with bit depth of 8
@@ -78,7 +78,7 @@ impl ImageType {
     }
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Clone)]
 ///A loaded png image
 pub struct Image {
     ///Width of the image

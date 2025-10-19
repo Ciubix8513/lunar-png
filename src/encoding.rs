@@ -9,7 +9,7 @@ use flate2::Compression;
 use pack1::{U16BE, U32BE};
 
 ///Compression level of the encoded image
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Copy, Clone)]
 pub enum CompressionLevel {
     ///No compression at all, fastest
     None,
@@ -24,7 +24,7 @@ pub enum CompressionLevel {
 //Compression options,
 //whether to write a timestamp
 //etc?
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone, Copy)]
 pub struct PngEncodingOptions {
     ///How much to compress  the image
     pub compression: CompressionLevel,
